@@ -11,6 +11,7 @@ const verifToken = (req, res, next) => {
         res.json({ success: false, message: "Invalid token provided" });
       } else {
         const decoded = jwt.decode(token);
+        console.log("decoded", decoded);
         const userId = decoded["user"];
         req.user = userId;
         next();

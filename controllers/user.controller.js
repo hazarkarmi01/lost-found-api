@@ -55,10 +55,50 @@ const signInUser = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+const updateUserProfile = async (req, res) => {
+  try {
+    let user = req.user;
+
+    const dataToUpdate = { ...req.body };
+    const updatedUser = await User.findByIdAndUpdate(
+      user,
+      { ...dataToUpdate },
+      { new: true }
+    );
+    res.json({
+      success: true,
+      message: "user updated sucessfully",
+      updatedUser,
+    });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+const updateUser = async (req, res) => {
+  try {
+    let user = req.params.user;
+
+    const dataToUpdate = { ...req.body };
+    const updatedUser = await User.findByIdAndUpdate(
+      user,
+      { ...dataToUpdate },
+      { new: true }
+    );
+    res.json({
+      success: true,
+      message: "user updated sucessfully",
+      updatedUser,
+    });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
 const userController = {
   getAllUsers: getAllUsers,
   createNewUser: createNewUser,
   signInUser: signInUser,
+  updateUserProfile: updateUserProfile,
+  updateUser: updateUser,
 };
-//testing git 
+//testing git
 module.exports = userController;
