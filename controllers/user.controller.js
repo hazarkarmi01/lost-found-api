@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const getAllUsers = async (req, res) => {
   try {
     let users = [];
-    const result = await User.find(); // select * from users ;
+    const result = await User.find({ isDeleted: false }); // select * from users ;
     users = result;
     res.json({ result: users, success: true });
   } catch (error) {
@@ -93,12 +93,24 @@ const updateUser = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+const deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const result = await User.findByIdAndUpdate(userId, {
+      isDeleted: true,
+    });
+    res.json({ success: true, result: result });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
 const userController = {
   getAllUsers: getAllUsers,
   createNewUser: createNewUser,
   signInUser: signInUser,
   updateUserProfile: updateUserProfile,
   updateUser: updateUser,
+  deleteUser: deleteUser,
 };
 //testing git
 module.exports = userController;

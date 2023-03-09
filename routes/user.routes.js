@@ -5,9 +5,14 @@ const verifAdmin = require("../utils/verifAdmin");
 const verifToken = require("../utils/verifToken");
 
 router.get("/", verifToken, verifAdmin, userController.getAllUsers);
-router.put("/update", verifToken, userController.updateUserProfile);
-router.put("/admin/update", verifToken, verifAdmin, userController.updateUser);
+router.put("/update/profile", verifToken, userController.updateUserProfile);
+router.put("/admin/update/:user", verifToken, verifAdmin, userController.updateUser);
 router.post("/create", userController.createNewUser);
 router.post("/login", userController.signInUser);
-
+router.delete(
+  "/delete/:userId",
+  verifToken,
+  verifAdmin,
+  userController.deleteUser
+);
 module.exports = router;
