@@ -29,7 +29,7 @@ const deleteCategory = async (req, res) => {
     let result = await Category.findByIdAndUpdate(
       categId,
       {
-        isArchived: true,
+        isArchived: true
       },
       { new: true }
     );
@@ -38,14 +38,22 @@ const deleteCategory = async (req, res) => {
     res.json({ success: false, result: error.message });
   }
 };
-
+const getCategoryById = async (req, res) => {
+  try {
+    let { categId } = req.params;
+    let result = await Category.findOne({ _id: categId, isArchived: false });
+    res.json({ success: true, result: result });
+  } catch (error) {
+    res.json({ success: false, result: error.message });
+  }
+};
 // Crée une nouvelle sous-catégorie
 const createSubCategory = async (req, res) => {
   try {
     let { name, parentCategory } = req.body;
     const newSubcCateg = new SubCategory({
       name,
-      parentCategory,
+      parentCategory
     });
     const result = await newSubcCateg.save();
     console.log("result", result);
@@ -65,7 +73,7 @@ const deleteSubCategory = async (req, res) => {
     let result = await SubCategory.findByIdAndUpdate(
       categId,
       {
-        isArchived: true,
+        isArchived: true
       },
       { new: true }
     );
@@ -93,4 +101,5 @@ module.exports = {
   createSubCategory,
   getAllSubCategories,
   deleteSubCategory,
+  getCategoryById
 };

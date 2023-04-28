@@ -2,7 +2,9 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const app = express();
+const cors = require('cors'); 
 // Utilisation de l'analyseur de corps de demande
+app.use(cors()); 
 app.use(express.json());
 const path = require("path");
 

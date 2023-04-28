@@ -1,6 +1,6 @@
 const CatgeoryController = require("../controllers/category.controller");
 const express = require("express");
-const verifToken = require("../utils/verifTOken");
+const verifToken = require("../utils/verifToken");
 const verifAdmin = require("../utils/verifAdmin");
 const router = express.Router();
 
@@ -29,6 +29,12 @@ router.delete(
   verifToken,
   verifAdmin,
   CatgeoryController.deleteCategory
+);
+router.get(
+  "/:categId",
+  verifToken,
+  verifAdmin,
+  CatgeoryController.getCategoryById
 );
 
 module.exports = router;
