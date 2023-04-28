@@ -14,12 +14,12 @@ const categoryRouter = require("./routes/category.routes");
 const annonceRouter = require("./routes/annonce.routes");
 
 // Utilisation des routeurs pour chaque entité et assignation d'un préfixe de route
-app.use("/users", userRouter);
-app.use("/category", categoryRouter);
-app.use("/annonce", annonceRouter);
+app.use("/api/users", userRouter);
+app.use("/api/category", categoryRouter);
+app.use("/api/annonce", annonceRouter);
 
 // Configuration de l'accès aux fichiers statiques dans le dossier 'uploads'
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Définition du port pour l'application
 const port = process.env.PORT || 3500;
