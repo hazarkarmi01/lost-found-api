@@ -2,9 +2,10 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const app = express();
-const cors = require('cors'); 
+const cors = require("cors");
+require('dotenv').config()
 // Utilisation de l'analyseur de corps de demande
-app.use(cors()); 
+app.use(cors());
 app.use(express.json());
 const path = require("path");
 
@@ -25,7 +26,7 @@ app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
 const port = process.env.PORT || 3500;
 
 // Connexion à la base de données MongoDB
-mongoose.connect("mongodb://localhost:27017/lostfound").then(() => {
+mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log("db is running");
 });
 
