@@ -20,7 +20,7 @@ const createNewAnnonce = async (req, res) => {
         category,
         subCategory,
         createdBy: user,
-        photos: photoPath,
+        photos: photoPath
       });
       // Enregistrement de la nouvelle annonce dans la base de données
       const result = await newAnnonce.save();
@@ -34,5 +34,17 @@ const createNewAnnonce = async (req, res) => {
   }
 };
 
+const getAllAnnonce = async (req, res) => {
+  try {
+    const result = await Annonce.find()
+      .populate("createdBy")
+      .populate("category")
+      .populate("subCategory");
+    res.json({ success: true, result });
+  } catch (error) {
+    res.json({ success: false, result: error.message });
+  }
+};
+
 // Exportation de la fonction pour la rendre disponible pour d'autres fichiers
-module.exports = { createNewAnnonce };
+module.exports = { createNewAnnonce, getAllAnnonce };
