@@ -22,4 +22,9 @@ router.post(
   annonceController.createNewAnnonce
 );
 router.get("/", verifToken, annonceController.getAllAnnonce);
+router.post(
+  "/create/item/",
+  verifToken,
+  annonceController.createNewAnnonceFromItem
+);
 module.exports = router;

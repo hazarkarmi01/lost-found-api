@@ -1,5 +1,6 @@
 // Importation du modèle d'annonce
 const Annonce = require("../models/annoce.model");
+const Item = require("../models/userItem.model");
 
 // Définition de la fonction pour créer une nouvelle annonce
 const createNewAnnonce = async (req, res) => {
@@ -45,6 +46,22 @@ const getAllAnnonce = async (req, res) => {
     res.json({ success: false, result: error.message });
   }
 };
-
+const createNewAnnonceFromItem = async (req, res) => {
+  try {
+    const { category, subCategory, itemId } = req.body;
+    const item = await Item.findById(itemId);
+    const newAnnonce = new Annonce({
+      title: item.name,
+      description: item.description,
+      photos: item.photos,
+      createdBy: item.owner,
+      category,
+      subCategory
+    });
+    res.json({ success: true, result });
+  } catch (error) {
+    res.json({ success: false, result: error.message });
+  }
+};
 // Exportation de la fonction pour la rendre disponible pour d'autres fichiers
-module.exports = { createNewAnnonce, getAllAnnonce };
+module.exports = { createNewAnnonce, getAllAnnonce,createNewAnnonceFromItem };
