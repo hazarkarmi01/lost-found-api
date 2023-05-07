@@ -55,7 +55,8 @@ const signInUser = async (req, res) => {
         res.json({
           success: true,
           userId: user._id,
-          token: token
+          token: token,
+          user: user
         });
       }
     }
