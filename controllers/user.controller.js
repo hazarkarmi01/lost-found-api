@@ -15,8 +15,15 @@ const getAllUsers = async (req, res) => {
 
 const createNewUser = async (req, res) => {
   try {
-    const { firstName, lastName, address, email, password, phoneNumber } =
-      req.body;
+    const {
+      firstName,
+      lastName,
+      address,
+      email,
+      password,
+      phoneNumber,
+      isAdmin
+    } = req.body;
     const hashPass = await bcrypt.hash(password, 10);
     const newUser = new User({
       firstName: firstName,
@@ -25,6 +32,7 @@ const createNewUser = async (req, res) => {
       address: address,
       phoneNumber: phoneNumber,
       password: hashPass,
+      role: isAdmin ? "ADMIN" : "USER"
     });
     const result = await newUser.save();
     res.json({ success: true, message: "user created succefully" });
@@ -47,7 +55,7 @@ const signInUser = async (req, res) => {
         res.json({
           success: true,
           userId: user._id,
-          token: token,
+          token: token
         });
       }
     }
@@ -68,7 +76,7 @@ const updateUserProfile = async (req, res) => {
     res.json({
       success: true,
       message: "user updated sucessfully",
-      updatedUser,
+      updatedUser
     });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -87,7 +95,7 @@ const updateUser = async (req, res) => {
     res.json({
       success: true,
       message: "user updated sucessfully",
-      updatedUser,
+      updatedUser
     });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -97,7 +105,7 @@ const deleteUser = async (req, res) => {
   try {
     const userId = req.params.userId;
     const result = await User.findByIdAndUpdate(userId, {
-      isDeleted: true,
+      isDeleted: true
     });
     res.json({ success: true, result: result });
   } catch (error) {
@@ -110,7 +118,7 @@ const userController = {
   signInUser: signInUser,
   updateUserProfile: updateUserProfile,
   updateUser: updateUser,
-  deleteUser: deleteUser,
+  deleteUser: deleteUser
 };
 //testing git
 module.exports = userController;
