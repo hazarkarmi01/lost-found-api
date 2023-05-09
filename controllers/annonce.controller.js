@@ -1,81 +1,106 @@
 // Importation du modèle d'annonce
 const Annonce = require("../models/annoce.model");
 const Item = require("../models/userItem.model");
+const vision = require("@google-cloud/vision");
+const { Storage } = require("@google-cloud/storage");
+
+const client = new vision.ImageAnnotatorClient({
+  // Replace with your Google Cloud project ID and credentials file path
+  projectId: "quick-platform-386215",
+  keyFilename: "./controllers/quick-platform-386215-050b00f72899.json"
+  //key: "AIzaSyAWGbcvySYStPDHT5pO5QDHxLVZ1ZlLN9c"
+});
+const storage = new Storage({
+  projectId: "quick-platform-386215",
+  keyFilename: "./controllers/quick-platform-386215-050b00f72899.json"
+});
+const bucket = storage.bucket("gs://test-bucket-lostfound");
+const BASE_URL ="https://13.82.2.24.nip.io/api"
 // Import the required TensorFlow.js libraries
 
-
 // Load the MobileNet model for feature extraction
-const loadModel = async () => {
-  const model = await mobilenet.load();
-  return model;
+const extractFeatures = async (imgPath) => {
+  const img = await cv.imreadAsync(imgPath);
+  const orb = new cv.ORB();
+  const keypoints = orb.detect(img);
+  const descriptors = orb.compute(img, keypoints);
+  return descriptors;
 };
-const modelPromise = loadModel();
-// Define a function to extract features from an image
-const extractFeatures = async (imagePath, model) => {
-  const image = tf.node.decodeImage(await fs.promises.readFile(imagePath));
-  const features = await model.infer(image);
-  image.dispose();
-  return features;
+
+const findSimilarAnnonce = async (photoPath) => {
+  try {
+    // Get all Annonce documents from the database
+    const allAnnonces = await Annonce.find({});
+    // Perform label detection on the uploaded images using the Google Vision SDK
+    const labelDetectionResponses = await Promise.all(
+      photoPath.map(async (path) => {
+        const [result] = await client.labelDetection(`${BASE_URL}/${path}`);
+        return result.labelAnnotations.map(
+          (annotation) => annotation.description
+        );
+      })
+    );
+    const uploadedLabels = labelDetectionResponses.flat();
+
+    // Filter the Annonce documents that have similar images
+    const similarAnnonces = allAnnonces.filter((annonce) => {
+      if (!annonce.photosLabels) return false;
+      const simLabels = uploadedLabels.filter((label) =>
+        annonce.photosLabels.includes(label)
+      );
+      return simLabels.length > 0;
+    });
+
+    return similarAnnonces;
+  } catch (error) {
+    console.log("Error in findSimilarAnnonce:", error);
+    return [];
+  }
 };
-// Define the createNewAnnonce function
+
 const createNewAnnonce = async (req, res) => {
   try {
-    // Récupération de l'utilisateur connecté à partir de la demande
     let user = req.user;
-    // Récupération des informations d'annonce à partir de la demande
     let { title, description, category, subCategory } = req.body;
-    // Récupération des fichiers joints à la demande
     const files = req.files;
     if (files) {
-      // Si des fichiers ont été joints à la demande, on enregistre leur chemin d'accès dans la variable photoPath
       const photoPath = files.map((elm) => elm.path);
 
-      // Load the pre-trained MobileNet model for feature extraction
-      const model = await modelPromise;
+      // Get all Annonce documents from the database
+      const allAnnonces = await Annonce.find({});
 
-      // Extract features from the new post images
-      const newFeatures = await Promise.all(
-        photoPath.map(async (path) => extractFeatures(path, model))
+      // Perform label detection on the uploaded images using the Google Vision SDK
+      const labelDetectionResponses = await Promise.all(
+        photoPath.map(async (path) => {
+          const [result] = await client.labelDetection(`${BASE_URL}/${path}`);
+          return result.labelAnnotations.map((annotation) => annotation.description);
+        })
       );
+      const uploadedLabels = labelDetectionResponses.flat();
 
-      // Query the database to retrieve the features of the existing posts
-      const existingPosts = await Annonce.find({}).select('photos');
-      const existingFeatures = [];
-      for (const post of existingPosts) {
-        const features = await Promise.all(
-          post.photos.map(async (path) => extractFeatures(path, model))
-        );
-        existingFeatures.push(...features);
-      }
+      // Filter the Annonce documents that have similar images
+      const similarAnnonces = findSimilarAnnonce(allAnnonces, uploadedLabels);
 
-      // Calculate the similarity scores between the new post and the existing posts
-      const similarityThreshold = 0.8;
-      const similarityScores = existingFeatures.map((features) =>
-        tf.losses.cosineDistance(tf.tensor(newFeatures), tf.tensor(features))
-      );
-      const isSimilar = similarityScores.some(
-        (score) => score.dataSync()[0] > similarityThreshold
-      );
-        console.log("Similair",isSimilar)
-      if (isSimilar) {
-        // If the similarity score exceeds the threshold, reject the new post
-        res.json({ success: false, message: 'Similar post exists' });
+      if (similarAnnonces.length > 0) {
+        // If there are similar Annonce documents, return all of them
+        res.json({ success: true, result: similarAnnonces });
       } else {
-        // Otherwise, create and save the new post
+        // Otherwise, create a new Annonce document
         const newAnnonce = new Annonce({
           title,
           description,
           category,
           subCategory,
           createdBy: user,
-          photos: photoPath
+          photos: photoPath,
+          photosLabels: uploadedLabels,
         });
         const result = await newAnnonce.save();
-        console.log('Files', files);
         res.json({ success: true, result });
       }
     }
   } catch (error) {
+    console.log("Error", error);
     res.json({ success: false, result: error.message });
   }
 };
