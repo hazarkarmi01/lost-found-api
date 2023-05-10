@@ -1,62 +1,39 @@
 // Importation du modèle d'annonce
 const Annonce = require("../models/annoce.model");
 const Item = require("../models/userItem.model");
-const vision = require("@google-cloud/vision");
-const { Storage } = require("@google-cloud/storage");
-
+const vision = require('@google-cloud/vision');
+const cloudinary = require('cloudinary').v2;
+cloudinary.config({
+  cloud_name: "dnozudt2x",
+  api_key: "956142484736458",
+  api_secret: "Y7w8mstqLX4B-KScPuuPVotkKd0"
+});
 const client = new vision.ImageAnnotatorClient({
   // Replace with your Google Cloud project ID and credentials file path
   projectId: "quick-platform-386215",
   keyFilename: "./controllers/quick-platform-386215-050b00f72899.json"
-  //key: "AIzaSyAWGbcvySYStPDHT5pO5QDHxLVZ1ZlLN9c"
 });
-const storage = new Storage({
-  projectId: "quick-platform-386215",
-  keyFilename: "./controllers/quick-platform-386215-050b00f72899.json"
-});
-const bucket = storage.bucket("gs://test-bucket-lostfound");
-const BASE_URL ="https://13.82.2.24.nip.io/api"
-// Import the required TensorFlow.js libraries
 
-// Load the MobileNet model for feature extraction
-const extractFeatures = async (imgPath) => {
-  const img = await cv.imreadAsync(imgPath);
-  const orb = new cv.ORB();
-  const keypoints = orb.detect(img);
-  const descriptors = orb.compute(img, keypoints);
-  return descriptors;
-};
+async function compareImages(imageUrl1, imageUrl2, visionClient) {
+  const response1 = await visionClient.imageProperties(imageUrl1);
+  const response2 = await visionClient.imageProperties(imageUrl2);
+  const dominantColors1 = response1[0].imagePropertiesAnnotation.dominantColors.colors
+    .slice(0, 3).map((color) => color.color.red + color.color.green + color.color.blue);
+  const dominantColors2 = response2[0].imagePropertiesAnnotation.dominantColors.colors
+    .slice(0, 3).map((color) => color.color.red + color.color.green + color.color.blue);
+  const similarityScore = calculateColorSimilarity(dominantColors1, dominantColors2);
+  return similarityScore;
+}
 
-const findSimilarAnnonce = async (photoPath) => {
-  try {
-    // Get all Annonce documents from the database
-    const allAnnonces = await Annonce.find({});
-    // Perform label detection on the uploaded images using the Google Vision SDK
-    const labelDetectionResponses = await Promise.all(
-      photoPath.map(async (path) => {
-        const [result] = await client.labelDetection(`${BASE_URL}/${path}`);
-        return result.labelAnnotations.map(
-          (annotation) => annotation.description
-        );
-      })
-    );
-    const uploadedLabels = labelDetectionResponses.flat();
+function calculateColorSimilarity(colors1, colors2) {
+  const sum = colors1.reduce((acc, color, index) => {
+    const difference = Math.abs(color - colors2[index]);
+    return acc + difference;
+  }, 0);
+  const similarityScore = (1 - (sum / (255 * 3))) * 100;
+  return similarityScore;
+}
 
-    // Filter the Annonce documents that have similar images
-    const similarAnnonces = allAnnonces.filter((annonce) => {
-      if (!annonce.photosLabels) return false;
-      const simLabels = uploadedLabels.filter((label) =>
-        annonce.photosLabels.includes(label)
-      );
-      return simLabels.length > 0;
-    });
-
-    return similarAnnonces;
-  } catch (error) {
-    console.log("Error in findSimilarAnnonce:", error);
-    return [];
-  }
-};
 
 const createNewAnnonce = async (req, res) => {
   try {
@@ -65,22 +42,30 @@ const createNewAnnonce = async (req, res) => {
     const files = req.files;
     if (files) {
       const photoPath = files.map((elm) => elm.path);
-
-      // Get all Annonce documents from the database
-      const allAnnonces = await Annonce.find({});
-
-      // Perform label detection on the uploaded images using the Google Vision SDK
-      const labelDetectionResponses = await Promise.all(
-        photoPath.map(async (path) => {
-          const [result] = await client.labelDetection(`${BASE_URL}/${path}`);
-          return result.labelAnnotations.map((annotation) => annotation.description);
+      const allAnnonces = await Annonce.find({}); 
+  
+      // Compare uploaded images with the images in the database
+      const visionClient = client
+      const similarityScores = await Promise.all(
+        photoPath.map(async (url) => {
+          const response = await visionClient.imageProperties(url);
+          const dominantColors = response[0].imagePropertiesAnnotation.dominantColors.colors
+            .slice(0, 3).map((color) => color.color.red + color.color.green + color.color.blue);
+          return Promise.all(
+            allAnnonces.map(async (annonce) => {
+              const similarityScore = await compareImages(url, annonce.photos[0], visionClient);
+              return similarityScore;
+            })
+          );
         })
       );
-      const uploadedLabels = labelDetectionResponses.flat();
 
       // Filter the Annonce documents that have similar images
-      const similarAnnonces = findSimilarAnnonce(allAnnonces, uploadedLabels);
-
+      const similarAnnonces = allAnnonces.filter((annonce, index) => {
+        const similarityScore = similarityScores[index];
+        return similarityScore && similarityScore.some((score) => score > SIMILARITY_THRESHOLD);
+      });
+      console.log("Similar",similarAnnonces)
       if (similarAnnonces.length > 0) {
         // If there are similar Annonce documents, return all of them
         res.json({ success: true, result: similarAnnonces });
@@ -93,7 +78,6 @@ const createNewAnnonce = async (req, res) => {
           subCategory,
           createdBy: user,
           photos: photoPath,
-          photosLabels: uploadedLabels,
         });
         const result = await newAnnonce.save();
         res.json({ success: true, result });
@@ -104,6 +88,8 @@ const createNewAnnonce = async (req, res) => {
     res.json({ success: false, result: error.message });
   }
 };
+
+const SIMILARITY_THRESHOLD = 0.7;
 // // Définition de la fonction pour créer une nouvelle annonce
 // const createNewAnnonce = async (req, res) => {
 //   try {
