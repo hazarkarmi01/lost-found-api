@@ -9,6 +9,8 @@ router.put("/update/profile", verifToken, userController.updateUserProfile);
 router.put("/admin/update/:user", verifToken, verifAdmin, userController.updateUser);
 router.post("/create", userController.createNewUser);
 router.post("/login", userController.signInUser);
+router.post("/deviceId",verifToken,userController.setDeviceId); 
+
 router.delete(
   "/delete/:userId",
   verifToken,

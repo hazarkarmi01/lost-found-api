@@ -16,6 +16,15 @@ const AnnonceSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "SubCategory",
   },
+  isLost: {
+    type: Boolean,
+    default: true,
+    required: true,
+  },
+  foundBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
 });
 
 const AnnonceModel = mongoose.model("Annonce", AnnonceSchema);
