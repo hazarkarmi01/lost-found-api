@@ -13,7 +13,7 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-export const setDeviceId = async (req, res) => {
+const setDeviceId = async (req, res) => {
   try {
     let user = req.user;
     let { deviceId } = req.body;
@@ -48,6 +48,7 @@ const createNewUser = async (req, res) => {
       phoneNumber: phoneNumber,
       password: hashPass,
       role: isAdmin ? "ADMIN" : "USER",
+      deviceId: "",
     });
     const result = await newUser.save();
     res.json({ success: true, message: "user created succefully" });
@@ -135,6 +136,7 @@ const userController = {
   updateUserProfile: updateUserProfile,
   updateUser: updateUser,
   deleteUser: deleteUser,
+  setDeviceId,
 };
 //testing git
 module.exports = userController;

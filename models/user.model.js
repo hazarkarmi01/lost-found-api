@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "USER",
     },
-    deviceId: { type: String, required: true, default: "" },
+    deviceId: { type: String, default: "" },
     isDeleted: { type: Boolean, default: false },
   },
   {

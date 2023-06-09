@@ -25,6 +25,12 @@ const AnnonceSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
   },
+  isArchived: {
+    type: Boolean,
+    default: false,
+  },
+},{
+  timestamps:true
 });
 
 const AnnonceModel = mongoose.model("Annonce", AnnonceSchema);

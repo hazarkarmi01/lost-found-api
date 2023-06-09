@@ -38,7 +38,15 @@ router.post(
   upload.array("photos"),
   annonceController.createNewAnnonce
 );
+router.post(
+  "/create-force",
+  verifToken,
+  upload.array("photos"),
+  annonceController.createNewAnnonceForced
+);
+router.put('/:id', verifToken, annonceController.updateAnnonce); 
 router.get("/", verifToken, annonceController.getAllAnnonce);
+router.get('/created', verifToken, annonceController.getAllAnnonceByUser)
 router.post(
   "/create/item/",
   verifToken,
@@ -49,4 +57,5 @@ router.put(
   verifToken,
   annonceController.markAnnonceAsFound
 );
+router.delete("/:id", verifToken, annonceController.deleteAnnonce);
 module.exports = router;

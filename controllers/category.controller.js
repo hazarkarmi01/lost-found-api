@@ -29,7 +29,7 @@ const deleteCategory = async (req, res) => {
     let result = await Category.findByIdAndUpdate(
       categId,
       {
-        isArchived: true
+        isArchived: true,
       },
       { new: true }
     );
@@ -53,7 +53,7 @@ const createSubCategory = async (req, res) => {
     let { name, parentCategory } = req.body;
     const newSubcCateg = new SubCategory({
       name,
-      parentCategory
+      parentCategory,
     });
     const result = await newSubcCateg.save();
     console.log("result", result);
@@ -69,15 +69,28 @@ const createSubCategory = async (req, res) => {
 // Supprime une sous-catégorie en fonction de son ID
 const deleteSubCategory = async (req, res) => {
   try {
-    let { categId } = req.params;
-    let result = await SubCategory.findByIdAndUpdate(
-      categId,
-      {
-        isArchived: true
-      },
-      { new: true }
-    );
-    res.json({ success: true, result: "Sub Category deleted successfuly" });
+    try {
+      const { subCategoryId } = req.params;
+
+      // Delete subcategory from SubCategory collection
+      await SubCategory.findByIdAndDelete(subCategoryId);
+
+      // Delete subcategory from Category collection
+      const category = await Category.findOneAndUpdate(
+        { "subCategories._id": subCategoryId },
+        { $pull: { subCategories: { _id: subCategoryId } } },
+        { new: true }
+      );
+
+      if (!category) {
+        return res.status(404).json({ message: "Category not found." });
+      }
+
+      res.json({ message: "Subcategory deleted successfully." });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server Error" });
+    }
   } catch (error) {
     res.json({ success: false, result: error.message });
   }
@@ -92,7 +105,15 @@ const getAllSubCategories = async (req, res) => {
     res.json({ success: false, result: error.message });
   }
 };
-
+const updateCategoryName = async (req, res) => {
+  try {
+    let { name } = req.body;
+    let result = await Category.findByIdAndUpdate(req.params.id, { name });
+    res.json({ success: true, result: result });
+  } catch (error) {
+    res.json({ success: false, result: error.message });
+  }
+};
 // Exporte toutes les fonctions pour être utilisées ailleurs
 module.exports = {
   deleteCategory,
@@ -101,5 +122,6 @@ module.exports = {
   createSubCategory,
   getAllSubCategories,
   deleteSubCategory,
-  getCategoryById
+  getCategoryById,
+  updateCategoryName,
 };

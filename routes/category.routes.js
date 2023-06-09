@@ -10,6 +10,12 @@ router.post(
   verifAdmin,
   CatgeoryController.createNewCategory
 );
+router.put(
+  "/update/:id",
+  verifToken,
+  verifAdmin,
+  CatgeoryController.updateCategoryName
+);
 router.get("/", verifToken, CatgeoryController.getAllCategories);
 router.post(
   "/sub/create",
@@ -19,7 +25,7 @@ router.post(
 );
 router.get("/sub", verifToken, CatgeoryController.getAllSubCategories);
 router.delete(
-  "/sub/:categId",
+  "/sub/:subCategoryId",
   verifToken,
   verifAdmin,
   CatgeoryController.deleteSubCategory

@@ -15,110 +15,157 @@ const client = new vision.ImageAnnotatorClient({
   keyFilename: "./controllers/quick-platform-386215-050b00f72899.json",
 });
 
-async function compareImages(imageUrl1, imageUrl2, visionClient) {
-  const response1 = await visionClient.imageProperties(imageUrl1);
-  const response2 = await visionClient.imageProperties(imageUrl2);
-  const dominantColors1 =
-    response1[0].imagePropertiesAnnotation.dominantColors.colors
-      .slice(0, 3)
-      .map((color) => color.color.red + color.color.green + color.color.blue);
-  const dominantColors2 =
-    response2[0].imagePropertiesAnnotation.dominantColors.colors
-      .slice(0, 3)
-      .map((color) => color.color.red + color.color.green + color.color.blue);
-  const similarityScore = calculateColorSimilarity(
-    dominantColors1,
-    dominantColors2
-  );
-  return similarityScore;
-}
+// async function compareImages(imageUrl1, imageUrl2, visionClient) {
+//   const response1 = await visionClient.imageProperties(imageUrl1);
 
-function calculateColorSimilarity(colors1, colors2) {
-  const sum = colors1.reduce((acc, color, index) => {
-    const difference = Math.abs(color - colors2[index]);
-    return acc + difference;
-  }, 0);
-  const similarityScore = (1 - sum / (255 * 3)) * 100;
+//   const response2 = await visionClient.imageProperties(imageUrl2);
+//   const dominantColors1 =
+//     response1[0].imagePropertiesAnnotation.dominantColors.colors
+//       .slice(0, 3)
+//       .map((color) => color.color.red + color.color.green + color.color.blue);
+//   const dominantColors2 =
+//     response2[0].imagePropertiesAnnotation.dominantColors.colors
+//       .slice(0, 3)
+//       .map((color) => color.color.red + color.color.green + color.color.blue);
+//   const similarityScore = calculateColorSimilarity(
+//     dominantColors1,
+//     dominantColors2
+//   );
+//   return similarityScore;
+// }
+
+// function calculateColorSimilarity(colors1, colors2) {
+//   const sum = colors1.reduce((acc, color, index) => {
+//     const difference = Math.abs(color - colors2[index]);
+//     return acc + difference;
+//   }, 0);
+//   const similarityScore = Math.max((1 - sum / (255 * 3)) * 100, 0);
+//   return similarityScore;
+// }
+const compareImages = async (imageUrl1, imageUrl2, visionClient) => {
+  const response1 = await visionClient.objectLocalization(imageUrl1);
+  const response2 = await visionClient.objectLocalization(imageUrl2);
+  
+  const objects1 = response1[0].localizedObjectAnnotations.map((obj) => obj.name);
+  const objects2 = response2[0].localizedObjectAnnotations.map((obj) => obj.name);
+  
+  const similarityScore = calculateObjectSimilarity(objects1, objects2);
   return similarityScore;
-}
+};
+
+const calculateObjectSimilarity = (objects1, objects2) => {
+  const intersection = objects1.filter((obj) => objects2.includes(obj));
+  const union = [...new Set([...objects1, ...objects2])];
+  
+  const similarityScore = (intersection.length / union.length) * 100;
+  return similarityScore;
+};
 
 const createNewAnnonce = async (req, res) => {
   try {
-    let user = req.user;
-    let { title, description, category, subCategory, isLost } = req.body;
+    const user = req.user;
+    const { title, description, category, subCategory, isLost } = req.body;
+
     const files = req.files;
-    if (files) {
-      const photoPath = files.map((elm) => elm.path);
-      let allAnnonces = [];
-      if (isLost) {
-        allAnnonces = await Annonce.find({ isLost: false });
-      } else {
-        allAnnonces = await Annonce.find({ isLost: true });
-      }
+    if (!files) {
+      res.json({ success: false, result: "No files uploaded" });
+      return;
+    }
 
-      // Compare uploaded images with the images in the database
-      const visionClient = client;
-      const similarityScores = await Promise.all(
-        photoPath.map(async (url) => {
-          const response = await visionClient.imageProperties(url);
-          const dominantColors =
-            response[0].imagePropertiesAnnotation.dominantColors.colors
-              .slice(0, 3)
-              .map(
-                (color) =>
-                  color.color.red + color.color.green + color.color.blue
-              );
-          return Promise.all(
-            allAnnonces.map(async (annonce) => {
-              const similarityScore = await compareImages(
-                url,
-                annonce.photos[0],
-                visionClient
-              );
-              return similarityScore;
-            })
-          );
-        })
-      );
+    const photoPaths = files.map((elm) => elm.path);
+    const itemIsLost = isLost === "true";
 
-      // Filter the Annonce documents that have similar images
-      const similarAnnonces = allAnnonces.filter((annonce, index) => {
-        const similarityScore = similarityScores[index];
-        //console.log("Similar Annonce", similarityScore);
-        if (similarityScore) {
-          const totalSimilarityScore = similarityScore.reduce(
-            (acc, score) => Number(acc) + Number(score),
-            0
-          );
-          const averageSimilarityScore =
-            totalSimilarityScore / similarityScore.length;
-          //console.log("Average Similar", averageSimilarityScore);
-          if (averageSimilarityScore > SIMILARITY_THRESHOLD) {
-            return true;
-          } else {
-            return false;
-          }
+    let allAnnonces = await Annonce.find({ isLost: !itemIsLost, isArchived: false })
+      .populate("createdBy")
+      .populate("category")
+      .populate("subCategory");
+
+    const visionClient = client;
+
+    const similarityScores = await Promise.all(
+      allAnnonces.map(async (annonce) => {
+        const annoncePhotoPaths = annonce.photos;
+
+        const similarityScoresForAnnouncement = await Promise.all(
+          photoPaths.map(async (photoPath) => {
+            const similarityScoresForImage = await Promise.all(
+              annoncePhotoPaths.map(async (announcementPhoto) => {
+                const similarityScore = await compareImages(photoPath, announcementPhoto, visionClient);
+                return similarityScore;
+              })
+            );
+            const averageSimilarityScore =
+              similarityScoresForImage.reduce((acc, score) => acc + score, 0) / similarityScoresForImage.length;
+            return averageSimilarityScore;
+          })
+        );
+
+        return similarityScoresForAnnouncement;
+      })
+    );
+
+    const similarAnnonces = allAnnonces.filter((annonce, annonceIndex) => {
+      const similarityScoresForAnnouncement = similarityScores[annonceIndex];
+
+      if (similarityScoresForAnnouncement && similarityScoresForAnnouncement.length > 0) {
+        const averageSimilarityScore =
+          similarityScoresForAnnouncement.reduce((acc, score) => acc + score, 0) / similarityScoresForAnnouncement.length;
+        console.log("AVERAGE", averageSimilarityScore)
+        if (!isNaN(averageSimilarityScore) && averageSimilarityScore >= SIMILARITY_THRESHOLD) {
+          return true;
         } else {
           return false;
         }
-      });
-
-      // If there are similar Annonce documents, return all of them
-      if (similarAnnonces.length > 0) {
-        res.json({ success: true, result: similarAnnonces, isLost });
       } else {
-        // Otherwise, create a new Annonce document
-        const newAnnonce = new Annonce({
-          title,
-          description,
-          category,
-          subCategory,
-          createdBy: user,
-          photos: photoPath,
-        });
-        const result = await newAnnonce.save();
-        res.json({ success: true, result });
+        return false;
       }
+    });
+
+    if (similarAnnonces.length > 0) {
+      res.json({
+        success: true,
+        hasSimilar: true,
+        result: similarAnnonces,
+        isLost: itemIsLost,
+      });
+    } else {
+      const newAnnonce = new Annonce({
+        title,
+        description,
+        category,
+        subCategory,
+        createdBy: user,
+        photos: photoPaths,
+        isLost: itemIsLost,
+      });
+      const result = await newAnnonce.save();
+      res.json({ success: true, result, hasSimilar: false });
+    }
+  } catch (error) {
+    console.log("Error", error);
+    res.json({ success: false, result: error.message });
+  }
+};
+
+const createNewAnnonceForced = async (req, res) => {
+  try {
+    let user = req.user;
+    let { title, description, category, subCategory, isLost } = req.body;
+
+    const files = req.files;
+    if (files) {
+      const photoPath = files.map((elm) => elm.path);
+      const newAnnonce = new Annonce({
+        title,
+        description,
+        category,
+        subCategory,
+        createdBy: user,
+        photos: photoPath,
+        isLost,
+      });
+      const result = await newAnnonce.save();
+      res.json({ success: true, result, hasSimilair: false });
     }
   } catch (error) {
     console.log("Error", error);
@@ -161,7 +208,24 @@ const SIMILARITY_THRESHOLD = 20;
 
 const getAllAnnonce = async (req, res) => {
   try {
-    const result = await Annonce.find()
+    const result = await Annonce.find({
+      isArchived: false,
+    })
+      .populate("createdBy")
+      .populate("category")
+      .populate("subCategory");
+    res.json({ success: true, result });
+  } catch (error) {
+    res.json({ success: false, result: error.message });
+  }
+};
+
+const getAllAnnonceByUser = async (req, res) => {
+  try {
+    const result = await Annonce.find({
+      isArchived: false,
+      createdBy: req.user,
+    })
       .populate("createdBy")
       .populate("category")
       .populate("subCategory");
@@ -181,7 +245,9 @@ const createNewAnnonceFromItem = async (req, res) => {
       createdBy: item.owner,
       category,
       subCategory,
+      isLost: true,
     });
+    const result = await newAnnonce.save();
     res.json({ success: true, result });
   } catch (error) {
     res.json({ success: false, result: error.message });
@@ -195,19 +261,61 @@ const markAnnonceAsFound = async (req, res) => {
       foundBy: user,
     });
     const message = getMessaging();
-    const foundAnnoce = await Annonce.findById(annonce._id).populate("foundBy");
+    const foundAnnoce = await Annonce.findById(annonce._id)
+      .populate("foundBy")
+      .populate("createdBy");
     let result = await message.send({
       notification: {
         title: "Element Trouvé",
         body: `${foundAnnoce.foundBy.firstName} ${foundAnnoce.foundBy.lastName} à marquer votre element comme trouvé, contacter le sur ${foundAnnoce.foundBy.phoneNumber}`,
       },
       data: {
-        annonce: foundAnnoce._id,
-        founderNumber: foundAnnoce.foundBy.phoneNumber,
+        annonce: foundAnnoce._id.toString(),
+        founderNumber: foundAnnoce.foundBy.phoneNumber.toString(),
       },
-      token: tokenDevice,
+      token: foundAnnoce.createdBy.deviceId,
     });
-  } catch (error) {}
+    res.json({ success: true, result });
+  } catch (error) {
+    console.log("Error", error);
+    res.json({ success: false, result: error.message });
+  }
+};
+const deleteAnnonce = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const annonce = await Annonce.findByIdAndUpdate(
+      id,
+      { isArchived: true },
+      { new: true }
+    );
+    res.json({ success: true, annonce });
+  } catch (error) {
+    res.json({ success: false, result: error.message });
+  }
+};
+const updateAnnonce = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const dataToUpdate = req.body;
+    const annonce = await Annonce.findByIdAndUpdate(
+      id,
+      { ...dataToUpdate },
+      { new: true }
+    );
+    res.json({ success: true, annonce });
+  } catch (error) {
+    res.json({ success: false, result: error.message });
+  }
 };
 // Exportation de la fonction pour la rendre disponible pour d'autres fichiers
-module.exports = { createNewAnnonce, getAllAnnonce, createNewAnnonceFromItem,markAnnonceAsFound };
+module.exports = {
+  createNewAnnonce,
+  getAllAnnonce,
+  createNewAnnonceFromItem,
+  markAnnonceAsFound,
+  deleteAnnonce,
+  getAllAnnonceByUser,
+  updateAnnonce,
+  createNewAnnonceForced,
+};
